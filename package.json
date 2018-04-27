@@ -1,0 +1,21 @@
+{
+  "name": "Inifinity Fighter",
+  "version": "0.0.1",
+  "description": "A multiplayer fighting made with Phaser, Node.js and Socket.io ",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LibreAppFoundation/infinity-racer"
+  },
+  "keywords": [
+  ],
+  "author": "Niyas C",
+  "license": "GPL",
+  "dependencies": {
+    "express": "^4.15.2",
+    "socket.io": "^1.7.3"
+  }
+}

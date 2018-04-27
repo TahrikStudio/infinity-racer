@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="viewport" content="width=device-width">
+
+	<script src="/socket.io/socket.io.js"></script>
+	<script type="text/javascript" src="js/phaser.min.js"></script>
+	<title>Infinity Fighter</title>
+</head>
+<body>
+	<div id='game'></div>
+</body>
+<script src="js/boot.js" type="text/javascript"></script>
+<script src="js/game.js" type="text/javascript"></script>
+<script src="js/client.js" type="text/javascript"></script>
+<script type="text/javascript">
+	game = new Phaser.Game(24*32, 17*32, Phaser.AUTO, 'game');
+
+	game.state.add('boot', InfinityFighter.Boot)
+	game.state.add('start', InfinityFighter.Game);
+	game.state.start('boot');
+</script>
+</html>
