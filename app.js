@@ -1,63 +1,158 @@
+//import express.js 
 var express = require('express');
+//assign it to variable app 
 var app = express();
-var server = require('http').Server(app);
-var io = require('socket.io').listen(server);
+//create a server and pass in app as a request handler
+var serv = require('http').Server(app); //Server-11
 
-app.use('/js',express.static(__dirname + '/js'));
-app.use('/assets',express.static(__dirname + '/assets'));
+const TIMEOUT_BEFORE_START = 5;
+const TURN_FACTOR = 0.10;
 
-app.get('/',function(req,res){
-    res.sendFile(__dirname+'/index.html');
+//send a index.html file when a get request is fired to the given 
+//route, which is ‘/’ in this case
+app.get('/', function (req, res) {
+	res.sendFile(__dirname + '/client/index.html');
 });
 
-server.listen(process.env.PORT || 8081,function(){
-    console.log('Listening on '+server.address().port);
-});
 
-io.on('connection',function(socket){
+app.use('/client', express.static(__dirname + '/client'));
 
-    socket.on('newplayer',function(){
-        socket.player = {
-            id: this.id,
-            x: randomInt(100,400),
-            y: randomInt(100,400)
-        };
-        socket.emit('allplayers',getAllPlayers());
+//listen on port 2000
+serv.listen(process.env.PORT || 2000);
+console.log("Server started.");
 
-        socket.broadcast.emit('newplayer',socket.player);
-        socket.broadcast.emit('addCoin', {x: 20, y:20});
+// binds the serv object we created to socket.io
+var io = require('socket.io')(serv, {});
 
-        socket.on('click',function(data){
-            console.log('click to '+data.x+', '+data.y);
-            socket.player.x = data.x;
-            socket.player.y = data.y;
-            io.emit('move', socket.player);
-        });
+var roomIndex = 0;
+var rooms = [];
 
-        socket.on('collectCoin', function(data) {
-            console.log(data.id + ", collected coin");
-            socket.broadcast.emit('addCoin', {x: Math.floor(Math.random() * 100), y: Math.floor(Math.random() * 100)});
-        });
-
-        socket.on('disconnect',function(){
-            io.emit('remove',socket.player.id);
-        });
-    });
-
-    socket.on('test',function(){
-        console.log('test received');
-    });
-});
-
-function getAllPlayers(){
-    var players = [];
-    Object.keys(io.sockets.connected).forEach(function(socketID){
-        var player = io.sockets.connected[socketID].player;
-        if(player) players.push(player);
-    });
-    return players;
+class Player {
+	constructor(id, car, track) {
+		this.id = id;
+		this.car = car;
+		this.track = track;
+		this.angle = Math.PI / 2;
+		this.velocity = 1;
+	}
 }
 
-function randomInt (low, high) {
-    return Math.floor(Math.random() * (high - low) + low);
+class Room {
+	constructor(id) {
+		this.id = id;
+		this.players = [];
+		this.started = false;
+	}
+
+	isfull (){
+		return this.players.length == 2 || this.started;
+	}
+
+	isEmpty() {
+		return this.players.length == 0;
+	}
+
+	addPlayer (socket) {
+		var player = new Player(socket.id, Math.floor((Math.random() * 5)), this.players.length);
+		this.players.push(player);
+	}
+
+	removePlayer(socket) {
+		var index = this.players.map(function(o) {
+			return o.id;
+		}).indexOf(socket.id);
+		
+		if (index > -1) {
+			this.players.splice(index, 1);
+		}
+	}
+
+	start() {
+		this.started = true;
+	}
 }
+
+/**
+ * Pickup a room with spaces or create a new room if any room
+ * 
+ */
+var pickupRoom = function () {
+
+	for (var room of rooms) {
+		if (!room.isfull()) {
+			return room;
+		}
+	}
+
+	var room = new Room(roomIndex++);
+	rooms.push(room);
+	return room;
+}
+
+function findRoomWithSocket(socket) {
+	var currentRoom;
+	for (var room of rooms) {
+		if (room.players.map(function (o) {
+			return o.id;
+		}).indexOf(socket.id) > -1) {
+			currentRoom = room;
+			break;
+		}
+	}
+	return currentRoom;
+}
+
+function sendData(room, event, data) {
+	for (var player of room.players) {
+		io.sockets.connected[player.id].emit(event, data);
+	}
+}
+
+function updateAngle(data) {
+	var socket = this;
+	var roomIndex = rooms.map(function(o) {return o.id}).indexOf(data.room);
+	if (roomIndex > -1) {
+		var room = rooms[roomIndex];
+		var playerIndex = room.players.map(function (o) {return o.id}).indexOf(socket.id);
+		if (playerIndex > -1) {
+			var player = room.players[playerIndex];
+			player.angle += data.factor * TURN_FACTOR;
+			sendData(room, 'update', {room: room.id, players: room.players});
+		}
+	}
+}
+
+// listen for a connection request from any client
+io.sockets.on('connection', function (socket) {
+	socket.emit('connect', {message: 'Connection established'});
+
+	var room = pickupRoom();
+	room.addPlayer(socket);
+	if (!room.isfull()) {
+		socket.emit('message', {message: 'Waiting for other\nplayers'});
+	} else {
+		sendData(room, 'timeout', {timeout: TIMEOUT_BEFORE_START});
+		room.start();
+		setTimeout(function() {
+			sendData(room, 'start', {room: room.id, players: room.players});
+		}, TIMEOUT_BEFORE_START);
+	}
+
+	socket.on('updateAngle', updateAngle);
+
+	socket.on('disconnect', function() {
+		var room = findRoomWithSocket(socket);
+		if (room) {
+			room.removePlayer(socket);
+			if (room.isEmpty()) {
+				var index = rooms.indexOf(room);
+				rooms.splice(index, 1);
+			} else {
+				sendData(room, 'disconnected', {id: socket.id});
+			}
+		}
+		//socket.removeAllListeners('disconnect');
+	});
+
+});
+
