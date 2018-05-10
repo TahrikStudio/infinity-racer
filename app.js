@@ -6,7 +6,11 @@ var app = express();
 var serv = require('http').Server(app); //Server-11
 
 const TIMEOUT_BEFORE_START = 5;
-const TURN_FACTOR = 0.10;
+const TURN_FACTOR = 0.40;
+const INITIAL_VELOCITY = 2;
+const PLAYER_COUNT = 2;
+// Update angle & speed once in every UPDATE_FREQ frame
+const UPDATE_FREQ = 20;
 
 //send a index.html file when a get request is fired to the given 
 //route, which is ‘/’ in this case
@@ -33,7 +37,7 @@ class Player {
 		this.car = car;
 		this.track = track;
 		this.angle = Math.PI / 2;
-		this.velocity = 1;
+		this.velocity = INITIAL_VELOCITY;
 	}
 }
 
@@ -45,7 +49,7 @@ class Room {
 	}
 
 	isfull (){
-		return this.players.length == 2 || this.started;
+		return this.players.length == PLAYER_COUNT || this.started;
 	}
 
 	isEmpty() {
@@ -134,7 +138,7 @@ io.sockets.on('connection', function (socket) {
 		sendData(room, 'timeout', {timeout: TIMEOUT_BEFORE_START});
 		room.start();
 		setTimeout(function() {
-			sendData(room, 'start', {room: room.id, players: room.players});
+			sendData(room, 'start', {room: room.id, players: room.players, updateFreq: UPDATE_FREQ});
 		}, TIMEOUT_BEFORE_START);
 	}
 

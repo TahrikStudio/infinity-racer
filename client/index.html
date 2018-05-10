@@ -8,7 +8,7 @@
     <!-- <link rel="icon" sizes="196x196" href="bunny.png"> -->
     <title>Infinity Racer</title>
     <style>
-    * {padding: 0; margin: 0}
+    * {padding: 0; margin: 0; background: #696969}
     </style>
 </head>
 
@@ -24,7 +24,7 @@
     <script src="client/Game.js"></script>
     <script>
         window.onload = function () {
-            var game = new Phaser.Game(540, 800, Phaser.AUTO, 'gameContainer');
+            var game = new Phaser.Game(this.screen.width, this.screen.hight, Phaser.AUTO, 'gameContainer');
             game.state.add('Boot', InfinityFighter.Boot);
             game.state.add('Preloader', InfinityFighter.Preloader);
             game.state.add('StartMenu', InfinityFighter.StartMenu);

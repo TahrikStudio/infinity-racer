@@ -10,11 +10,16 @@ InfinityFighter.Game.prototype = {
 		this.timeout;
 		this.countdown;
 		this.players;
+		this._target_players;
 		this.playing;
 		this.cars = [];
 		this.room;
 		this.socket;
 		this.bgm = this.add.audio('bg');
+		this.updateFreq;
+		this.updateCounter;
+		this.controls = {};
+		this.diff_tolerance = 0.01;
 	},
 	create: function () {
 		var _game = this;
@@ -37,25 +42,69 @@ InfinityFighter.Game.prototype = {
 			_game.timer.stop();
 			_game.playing = true;
 			_game.players = data.players;
-			_game.room = data.room;			
+			_game.room = data.room;
+			_game.updateFreq = data.updateFreq;
+			_game.updateCounter = 0;	
 
-			_game.renderRoadBound();
+			_game.renderDivider();
 			_game.renderCars(_game.players);
-			_game.input.onTap.add(_game.turnCar, _game);
+			_game.renderControls();
+			//_game.input.onTap.add(_game.turnCar, _game);
 		});
 		this.socket.on("update", function(data) {
-			_game.players = data.players;
+			_game._target_players = data.players;
 		});
 		this.socket.on("disconnected", function(data) {
 			_game.showMessage("Player " + data.id + " \ndisconnected from server");
 		});
 	},
-	turnCar: function(pointer) {
-		if (pointer.clientX > this.world.width / 2) {
-			this.socket.emit('updateAngle', {room: this.room, factor: -1});
-		} else {
-			this.socket.emit('updateAngle', {room: this.room, factor: 1});
+	renderControls: function() {
+		var center = this.camera.width / 2;
+		this.controls.left = this.add.image(center - 60, this.camera.height - 100, 'left');
+		this.controls.right = this.add.image(center + 60, this.camera.height - 100, 'right');
+		this.controls.up = this.add.image(center, this.camera.height - 140, 'up');
+		this.controls.down = this.add.image(center, this.camera.height - 60, 'down');
+
+		this.controls.left.fixedToCamera = true;
+		this.controls.right.fixedToCamera = true;
+		this.controls.up.fixedToCamera = true;
+		this.controls.down.fixedToCamera = true;
+		
+		this.controls.left.anchor.setTo(1, 0);
+		this.controls.up.anchor.setTo(0.5, 0);
+		this.controls.down.anchor.setTo(0.5, 0);
+
+		this.controls.left.inputEnabled = true;
+		this.controls.right.inputEnabled = true;
+		this.controls.up.inputEnabled = true;
+		this.controls.down.inputEnabled = true;
+	},
+	turnLeft: function(a, b) {
+		console.log("called left");
+		this.turnCar(1);
+	},
+	turnRight: function(a, b) {
+		this.turnCar(-1);
+	},
+	turnCar: function(factor) {
+		console.log('turn car');
+		var index = this.players.map(function(o) {return o.id}).indexOf(this.socket.id);
+		var player = this.players[index];
+		var target_player;
+
+		if (this._target_players != undefined) {
+			target_player = this._target_players[index];
+			var diff = target_player.angle - player.angle;
+			if (diff > this.diff_tolerance && factor == 1 || diff < -this.diff_tolerance && factor == -1) {
+				return;
+			}
 		}
+
+		if (player.angle > Math.PI && factor == 1 || player.angle < 0 && factor == -1){
+			return;
+		}
+
+		this.socket.emit('updateAngle', {room: this.room, factor: factor});
 	},
 	renderCars: function() {
 		var tracks = this.players.length;
@@ -69,10 +118,9 @@ InfinityFighter.Game.prototype = {
 			this.cars.push(car);
 		}
 	},
-	renderRoadBound: function() {
+	renderDivider: function() {
 		for (var i = 0; i < this.world.height; i += 50) {
-			this.add.image(20, i, 'road-bound');
-			this.add.image(this.world.width - 40, i, 'road-bound');
+			this.add.image(this.world.width/ 2, i, 'road-bound').anchor.setTo(0.5, 0.5);
 		}
 	},
 	showMessage: function(message, x = 0){
@@ -97,6 +145,7 @@ InfinityFighter.Game.prototype = {
 	update: function() {
 		this.updateTimeoutMessage();
 		if (this.playing) {
+			this.checkInput();
 			for (var i = 0; i < this.cars.length; i++) {
 				var car = this.cars[i];
 				var player = this.players[i];
@@ -109,10 +158,30 @@ InfinityFighter.Game.prototype = {
 				}
 				
 				car.angle = -(player.angle - Math.PI / 2) * 180 / Math.PI;
+
+				if (this._target_players) {
+					var target_player = this._target_players[i];
+					var diff = target_player.angle - player.angle;
+					if (diff > 0.01) {
+						player.angle += 0.01;
+					} else if (diff < -0.01) {
+						player.angle -= 0.01;
+					}
+				}
 			}
 			var index = this.players.map(function(o) {return o.id}).indexOf(this.socket.id);
 			var car = this.cars[index];
 			this.camera.y = this.world.height - this.camera.height - (this.world.height - car.y) + 200;
+		}
+	},
+	checkInput: function() {
+		this.updateCounter = (this.updateCounter + 1) % this.updateFreq;
+		if (this.updateCounter == 0 && this.input.activePointer.isDown) {
+			if (this.controls.left.input.checkPointerOver(this.input.activePointer)) {
+				this.turnLeft();
+			} else if (this.controls.right.input.checkPointerOver(this.input.activePointer)) {
+				this.turnRight();
+			}
 		}
 	}
 }
