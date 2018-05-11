@@ -1,3 +1,6 @@
+const POS_FACTOR = 1;
+const ANGLE_FACTOR = 0.01;
+
 
 InfinityFighter.Game = function(game){
 };
@@ -19,7 +22,6 @@ InfinityFighter.Game.prototype = {
 		this.updateFreq;
 		this.updateCounter;
 		this.controls = {};
-		this.diff_tolerance = 0.01;
 	},
 	create: function () {
 		var _game = this;
@@ -36,7 +38,7 @@ InfinityFighter.Game.prototype = {
 		});
 		this.socket.on("start", function(data) {
 			_game.bgm.play();
-			_game.world.setBounds(0, 0, _game.world.width, 2000);
+			_game.world.setBounds(0, 0, data.world.width, data.world.height);
 			_game.timeout = false;
 			_game.showMessage("Starting game...", 120);
 			_game.timer.stop();
@@ -80,11 +82,10 @@ InfinityFighter.Game.prototype = {
 		this.controls.down.inputEnabled = true;
 	},
 	turnLeft: function(a, b) {
-		console.log("called left");
-		this.turnCar(1);
+		this.turnCar(-1);
 	},
 	turnRight: function(a, b) {
-		this.turnCar(-1);
+		this.turnCar(1);
 	},
 	turnCar: function(factor) {
 		console.log('turn car');
@@ -94,17 +95,16 @@ InfinityFighter.Game.prototype = {
 
 		if (this._target_players != undefined) {
 			target_player = this._target_players[index];
-			var diff = target_player.angle - player.angle;
-			if (diff > this.diff_tolerance && factor == 1 || diff < -this.diff_tolerance && factor == -1) {
+			var diff = (target_player.angle - player.angle) / 5;
+			if (diff > ANGLE_FACTOR && factor == 1 || diff < -ANGLE_FACTOR && factor == -1) {
 				return;
 			}
 		}
 
-		if (player.angle > Math.PI && factor == 1 || player.angle < 0 && factor == -1){
-			return;
-		}
-
 		this.socket.emit('updateAngle', {room: this.room, factor: factor});
+	},
+	changeSpeed: function(factor) {
+		this.socket.emit('updateSpeed', {room: this.room, factor: factor});
 	},
 	renderCars: function() {
 		var tracks = this.players.length;
@@ -112,7 +112,7 @@ InfinityFighter.Game.prototype = {
 
 		for (var i = 0; i < this.players.length; i++) {
 			var player = this.players[i];
-			var car = this.add.sprite((player.track + 0.5) * trackWidth, this.world.height - 100, 'cars');
+			var car = this.add.sprite(player.x, player.y, 'cars');
 			car.anchor.setTo(0.5, 0.5);
 			car.frame = player.car;
 			this.cars.push(car);
@@ -149,24 +149,51 @@ InfinityFighter.Game.prototype = {
 			for (var i = 0; i < this.cars.length; i++) {
 				var car = this.cars[i];
 				var player = this.players[i];
-				var xdiff = Math.cos(player.angle) * player.velocity;
-				if (car.y > 60) {
-					car.y -= Math.sin(player.angle) * player.velocity;
-				}
-				if (car.x > 60 && xdiff < 0 || car.x < this.world.width - 60 && xdiff > 0) {
-					car.x += xdiff;
-				}
+				// var xdiff = Math.cos(player.angle) * player.velocity;
+				// if (car.y > 60) {
+				// 	car.y -= Math.sin(player.angle) * player.velocity;
+				// }
+				// if (car.x > 60 && xdiff < 0 || car.x < this.world.width - 60 && xdiff > 0) {
+				// 	car.x += xdiff;
+				// }
 				
-				car.angle = -(player.angle - Math.PI / 2) * 180 / Math.PI;
+				car.angle = player.angle * 180 / Math.PI;
 
 				if (this._target_players) {
-					var target_player = this._target_players[i];
-					var diff = target_player.angle - player.angle;
-					if (diff > 0.01) {
-						player.angle += 0.01;
-					} else if (diff < -0.01) {
-						player.angle -= 0.01;
+					var target = this._target_players[i];
+					var diff = target.angle - player.angle;
+					if (diff > ANGLE_FACTOR) {
+						player.angle += ANGLE_FACTOR;
+					} else if (diff < -ANGLE_FACTOR) {
+						player.angle -= ANGLE_FACTOR;
 					}
+					//player.angle = target.angle;
+					player.velocity = target.velocity;
+
+					var xdiff = player.x - target.x;
+					var ydiff = player.y - target.y;
+
+					if (Math.abs(xdiff) > POS_FACTOR) {
+						if (xdiff > 0) {
+							player.x -= Math.abs(Math.sin(player.angle) * POS_FACTOR);
+						} else {
+							player.x += Math.abs(Math.sin(player.angle) * POS_FACTOR);
+						}
+					} else {
+						player.x = target.x;
+					}
+
+					if (Math.abs(ydiff) > POS_FACTOR) {
+						if (ydiff > 0) {
+							player.y -= Math.cos(player.angle) * POS_FACTOR * player.velocity;
+						} else {
+							player.y += Math.cos(player.angle) * POS_FACTOR * player.velocity;
+						}
+					} else {
+						player.y = target.y;
+					}
+					car.x = player.x;
+					car.y = player.y;
 				}
 			}
 			var index = this.players.map(function(o) {return o.id}).indexOf(this.socket.id);
@@ -181,6 +208,12 @@ InfinityFighter.Game.prototype = {
 				this.turnLeft();
 			} else if (this.controls.right.input.checkPointerOver(this.input.activePointer)) {
 				this.turnRight();
+			}
+			if (this.controls.up.input.checkPointerOver(this.input.activePointer)) {
+				this.changeSpeed(1);
+			}
+			if (this.controls.down.input.checkPointerOver(this.input.activePointer)) {
+				this.changeSpeed(-1);
 			}
 		}
 	}
