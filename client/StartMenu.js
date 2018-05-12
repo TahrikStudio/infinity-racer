@@ -13,7 +13,13 @@ InfinityFighter.StartMenu.prototype = {
 		startBG.inputEnabled = true;
 		startBG.events.onInputDown.addOnce(this.startGame, this);
 		
-		startPrompt = this.add.bitmapText(this.world.centerX-155, this.world.centerY+180, 'eightbitwonder', 'Touch to Start!', 24);
+		startPrompt = this.add.text(this.world.centerX, this.world.centerY, 'Touch to Start!', {
+			font: "bold 24px Arial", 
+			fill: "#fff", 
+			boundsAlignH: "center", 
+			boundsAlignV: "middle" 
+		});
+		startPrompt.anchor.setTo(0.5, 0.5);
 	},
 
 	startGame: function (pointer) {

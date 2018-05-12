@@ -22,13 +22,15 @@ InfinityFighter.Game.prototype = {
 		this.updateFreq;
 		this.updateCounter;
 		this.controls = {};
+		this.current_player;
+		this.status = {};
 	},
 	create: function () {
 		var _game = this;
 		this.socket = io.connect(); // send a connection request to the server
 		console.log("client started");
 		this.socket.on("message", function(data) {
-			_game.showMessage(data.message, 80);
+			_game.showMessage(data.message);
 		});
 		this.socket.on("timeout", function(data) {
 			_game.timeout = true;
@@ -51,6 +53,7 @@ InfinityFighter.Game.prototype = {
 			_game.renderDivider();
 			_game.renderCars(_game.players);
 			_game.renderControls();
+			_game.renderStatus()
 			//_game.input.onTap.add(_game.turnCar, _game);
 		});
 		this.socket.on("update", function(data) {
@@ -59,6 +62,33 @@ InfinityFighter.Game.prototype = {
 		this.socket.on("disconnected", function(data) {
 			_game.showMessage("Player " + data.id + " \ndisconnected from server");
 		});
+	},
+	renderStatus: function() {
+		var player = this.currentPlayer();
+		this.status.position = this.add.text(20, 20, "Position : " + player.position, {
+			font: "16px Arial", 
+			fill: "#fff"
+		});
+		this.status.speed = this.add.text(this.camera.width - 20, 20,    "Speed : " + player.velocity, {
+			font: "16px Arial", 
+			fill: "#fff"
+		});
+		this.status.speed.anchor.setTo(1, 0);
+
+		this.status.position.fixedToCamera = true;
+		this.status.speed.fixedToCamera = true;
+	},
+	updateStatus: function() {
+		var player = this.currentPlayer();
+		this.status.position.setText("Position : " + player.position);
+		this.status.speed.setText("Speed : " + player.velocity)
+	},
+	currentPlayer: function() {
+		if (this.current_player == undefined) {
+			var index = this.players.map(function(o) {return o.id}).indexOf(this.socket.id);
+			this.current_player = this.players[index];
+		}
+		return this.current_player;
 	},
 	renderControls: function() {
 		var center = this.camera.width / 2;
@@ -82,10 +112,10 @@ InfinityFighter.Game.prototype = {
 		this.controls.down.inputEnabled = true;
 	},
 	turnLeft: function(a, b) {
-		this.turnCar(-1);
+		this.turnCar(1);
 	},
 	turnRight: function(a, b) {
-		this.turnCar(1);
+		this.turnCar(-1);
 	},
 	turnCar: function(factor) {
 		console.log('turn car');
@@ -96,6 +126,9 @@ InfinityFighter.Game.prototype = {
 		if (this._target_players != undefined) {
 			target_player = this._target_players[index];
 			var diff = (target_player.angle - player.angle) / 5;
+			// if (target_player.angle > Math.PI / 2 || target_player.angle < -Math.PI / 2) {
+			// 	return;
+			// }
 			if (diff > ANGLE_FACTOR && factor == 1 || diff < -ANGLE_FACTOR && factor == -1) {
 				return;
 			}
@@ -123,13 +156,16 @@ InfinityFighter.Game.prototype = {
 			this.add.image(this.world.width/ 2, i, 'road-bound').anchor.setTo(0.5, 0.5);
 		}
 	},
-	showMessage: function(message, x = 0){
+	showMessage: function(message, x = this.camera.width / 2){
 		if (this.message) {
 			this.message.destroy();
 		}
-		this.message = this.add.bitmapText(x, this.world.centerY, 
-			'eightbitwonder', message, 24);
-		this.message.align = "center";
+		this.message = this.add.text(x, this.world.centerY, message, {
+			font: "bold 24px Arial", 
+			fill: "#fff", 
+			align: "center"
+		});
+		this.message.anchor.setTo(0.5, 0.5);
 	},
 	updateMessage: function(text) {
 		this.message.setText(text);
@@ -145,6 +181,7 @@ InfinityFighter.Game.prototype = {
 	update: function() {
 		this.updateTimeoutMessage();
 		if (this.playing) {
+			this.updateStatus();
 			this.checkInput();
 			for (var i = 0; i < this.cars.length; i++) {
 				var car = this.cars[i];
@@ -157,7 +194,7 @@ InfinityFighter.Game.prototype = {
 				// 	car.x += xdiff;
 				// }
 				
-				car.angle = player.angle * 180 / Math.PI;
+				car.angle = this.math.radToDeg(Math.PI / 2 - player.angle);// * 180 / Math.PI;
 
 				if (this._target_players) {
 					var target = this._target_players[i];
@@ -174,20 +211,30 @@ InfinityFighter.Game.prototype = {
 					var ydiff = player.y - target.y;
 
 					if (Math.abs(xdiff) > POS_FACTOR) {
+						var change = Math.abs(Math.cos(player.angle) * POS_FACTOR * player.velocity)
 						if (xdiff > 0) {
-							player.x -= Math.abs(Math.sin(player.angle) * POS_FACTOR);
+							if (player.x - change >= 60) {
+								player.x -= change;
+							} else {
+								player.x = target.x;
+							}
 						} else {
-							player.x += Math.abs(Math.sin(player.angle) * POS_FACTOR);
+							if (player.x + change < this.camera.width - 60) {
+								player.x += change;
+							} else {
+								player.x = target.x;
+							}
 						}
 					} else {
 						player.x = target.x;
 					}
 
 					if (Math.abs(ydiff) > POS_FACTOR) {
+						var change = Math.abs(Math.sin(player.angle) * POS_FACTOR * player.velocity);
 						if (ydiff > 0) {
-							player.y -= Math.cos(player.angle) * POS_FACTOR * player.velocity;
+							player.y -= change;
 						} else {
-							player.y += Math.cos(player.angle) * POS_FACTOR * player.velocity;
+							player.y += change;
 						}
 					} else {
 						player.y = target.y;

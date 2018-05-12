@@ -6,7 +6,7 @@ var app = express();
 var serv = require('http').Server(app); //Server-11
 
 const TIMEOUT_BEFORE_START = 5;
-const TURN_FACTOR = 0.40;
+const TURN_FACTOR = Math.PI / 4;
 const INITIAL_VELOCITY = 2;
 const PLAYER_COUNT = 2;
 // Update angle & speed once in every UPDATE_FREQ frame
@@ -44,10 +44,11 @@ class Player {
 		this.id = id;
 		this.car = car;
 		this.track = track;
-		this.angle = 0;
+		this.angle = Math.PI / 2;
 		this.velocity = INITIAL_VELOCITY;
 		this.x = x;
 		this.y = y;
+		this.position = 1;
 	}
 }
 
@@ -148,7 +149,7 @@ function updateAngle(data) {
 		var playerIndex = room.players.map(function (o) {return o.id}).indexOf(socket.id);
 		if (playerIndex > -1) {
 			var player = room.players[playerIndex];
-			player.angle += data.factor * TURN_FACTOR;
+			player.angle = (player.angle + data.factor * TURN_FACTOR);
 			sendData(room, 'update', {room: room.id, players: room.players});
 		}
 	}
@@ -156,13 +157,52 @@ function updateAngle(data) {
 
 function updateParams(room) {
 	for (var player of room.players) {
-		var xdiff = Math.sin(player.angle) * player.velocity * POS_FACTOR;
-		var ydiff = -Math.cos(player.angle) * player.velocity * POS_FACTOR;
-		if (player.y > 60 && ydiff < 0 || player.y <= WORLD_HEIGHT - 60 && ydiff > 0) {
-			player.y += ydiff;
+		var angle = player.angle % (2 * Math.PI);
+		var xdiff = Math.cos(angle) * player.velocity * POS_FACTOR;
+		var ydiff = Math.sin(angle) * player.velocity * POS_FACTOR;
+		var absXdiff = Math.abs(xdiff);
+		var absYdiff = Math.abs(ydiff);
+		console.log("xdiff : %f, ydiff : %f, angle : %f", xdiff, ydiff, angle * 180 / Math.PI);
+		console.log(xdiff);
+		console.log("(x, y)" + player.x + ", " + player.y);
+		if ((angle >= 0 && angle <= Math.PI || angle <= -Math.PI) && player.velocity > 0) {
+			if (player.y  - absYdiff > 60) {
+				player.y -= absYdiff;
+			} else {
+				player.y = 60;
+			}
+		} else {
+			if (player.y + absYdiff < WORLD_HEIGHT - 60) {
+				player.y += absYdiff;
+			} else {
+				player.y = WORLD_HEIGHT - 60;
+			}
 		}
-		if (player.x > 60 && xdiff < 0 || player.x < WORLD_WIDTH - 60 && xdiff > 0) {
-			player.x += xdiff;
+		// if (player.y >= 60 && ydiff < 0 || player.y <= WORLD_HEIGHT - 60 && ydiff > 0) {
+		// 	player.y += ydiff;
+		// } else {
+		// 	if (ydiff < 0) {
+		// 		player.y = 60;
+		// 	} else if (ydiff > 0) {
+		// 		player.y = WORLD_HEIGHT - 60;
+		// 	}
+		// }
+		// if (player.x > 60 && xdiff < 0 || player.x < WORLD_WIDTH - 60 && xdiff > 0) {
+		// 	console.log("Adding " + xdiff);
+		// 	player.x += xdiff;
+		// }
+		if ((angle >= 0.5 * Math.PI && angle <= 1.5 * Math.PI || angle <= -0.5 * Math.PI && angle >= -1.5 * Math.PI) && player.velocity > 0) {
+			if (player.x - absXdiff > 60) {
+				player.x -= absXdiff;
+			} else {
+				player.x = 60;
+			}
+		} else {
+			if (player.x + absXdiff < WORLD_WIDTH - 60) {
+				player.x += absXdiff;
+			} else {
+				player.x = WORLD_WIDTH - 60;
+			}
 		}
 	}
 }

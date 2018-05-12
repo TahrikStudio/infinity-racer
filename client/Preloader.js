@@ -14,7 +14,7 @@ InfinityFighter.Preloader.prototype = {
         this.titleText.anchor.setTo(0.5, 0.5);
         this.load.spritesheet('cars', 'client/img/cars.png', 76.8, 128, 5);
         this.load.image('titlescreen', 'client/img/TitleBG.png');
-        this.load.bitmapFont('eightbitwonder', 'client/fonts/eightbitwonder.png', 'client/fonts/eightbitwonder.fnt');
+        //this.load.bitmapFont('eightbitwonder', 'client/fonts/eightbitwonder.png', 'client/fonts/eightbitwonder.fnt');
         this.load.image('road-bound', 'client/img/roadbound.png');
         this.load.image('up', 'client/img/up.png');
         this.load.image('down', 'client/img/down.png');
