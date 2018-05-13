@@ -19,7 +19,7 @@ InfinityFighter.Boot.prototype = {
 		this.scale.setScreenSize(true);
 
 		this.input.addPointer();
-		this.stage.backgroundColor = '#696969';
+		this.stage.backgroundColor = '#8bbc3c';
 
 		this.state.start('Preloader');
 	},

@@ -41,7 +41,13 @@ InfinityFighter.Game.prototype = {
 			_game.showMessage("Game will start \nin " + data.timeout + " seconds", 90);
 		});
 		this.socket.on("start", function(data) {
+			console.log("Received start command");
+			console.log("initial data " + data.players);
 			_game.bgm.play();
+			if (_game.sound.usingWebAudio &&
+				_game.sound.context.state === 'suspended') {
+				_game.input.onTap.addOnce(_game.sound.context.resume, _game.sound.context);
+			}
 			_game.world.setBounds(0, 0, data.world.width, data.world.height);
 			_game.timeout = false;
 			_game.showMessage("Starting game...", 120);
@@ -52,7 +58,8 @@ InfinityFighter.Game.prototype = {
 			_game.updateFreq = data.updateFreq;
 			_game.updateCounter = 0;	
 			_game.time.advancedTiming = true;
-			_game.renderDivider();
+			_game.camera.width = data.world.width;
+			_game.renderRoad();
 			_game.renderFinish();
 			_game.renderCars(_game.players);
 			_game.renderControls();
@@ -168,9 +175,9 @@ InfinityFighter.Game.prototype = {
 			this.cars.push(car);
 		}
 	},
-	renderDivider: function() {
-		for (var i = 0; i < this.world.height; i += 50) {
-			this.add.image(this.world.width/ 2, i, 'road-bound').anchor.setTo(0.5, 0.5);
+	renderRoad: function() {
+		for (var i = 0; i < this.world.height; i += 204) {
+			this.add.image(0, i, 'road');
 		}
 	},
 	showMessage: function(message, x = this.camera.width / 2){
@@ -196,10 +203,11 @@ InfinityFighter.Game.prototype = {
 		this.countdown--;
 	},
 	update: function() {
+		console.log(this.time.fps);
 		this.updateTimeoutMessage();
 		if (this.playing) {
-			this.updateStatus();
 			this.checkInput();
+			this.updateStatus();
 			for (var i = 0; i < this.cars.length; i++) {
 				var car = this.cars[i];
 				var player = this.players[i];
@@ -276,11 +284,13 @@ InfinityFighter.Game.prototype = {
 	},
 	updateScoreBoard: function() {
 		var finished = false;
+		var unfinished = false;
 		for (var i = 0; i < this.players.length; i++) {
 			var player = this.players[i];
 			if (player.finished) {
 				finished = true;
-				break;
+			} else {
+				unfinished = true;
 			}
 		}
 
@@ -299,12 +309,21 @@ InfinityFighter.Game.prototype = {
 			for (var i = 0; i < this.players.length; i++) {
 				var player = this.players[i];
 				if (player.finished) {
-					players = players + player.id + "\n";
+					var desc = '';
+					if (player.id == this.socket.id) {
+						desc = ' (You)';
+					}
+					players = players + player.id + desc + "\n";
 					positions = positions + player.position + "\n";
  				}
 			}
 			this.score_board.position.setText(positions);
 			this.score_board.player.setText(players);
+
+			if (!unfinished && !this.score_board.restart.visible) {
+				this.score_board.restart.visible = true;
+				this.playing = false;
+			}
 		}
 	},
 	renderScoreBoard: function() {
@@ -312,7 +331,7 @@ InfinityFighter.Game.prototype = {
 		var width = this.camera.width;
 		var height = 60 + this.players.length * 60;
 		var xpos = this.camera.width / 2;
-		var ypos = this.camera.height / 2;
+		var ypos = (this.camera.height - height) / 2;
 		var bmd = this.add.bitmapData(width, height);
 		bmd.ctx.beginPath();
 		bmd.ctx.rect(0, 0, width, height);
@@ -352,14 +371,21 @@ InfinityFighter.Game.prototype = {
 		});
 		this.score_board.position.fixedToCamera = true;
 		this.score_board.player = this.add.text(this.camera.width - 60, ypos + 60, "", {
-			font: "bold 14px Arial", 
+			font: "14px Arial", 
 			fill: "#fff", 
 			align: "center"
 		});
 		this.score_board.player.anchor.setTo(1, 0);
 		this.score_board.player.fixedToCamera = true;
+		
+		this.score_board.restart = this.add.image(this.camera.width / 2, ypos + height + 10, 'restart');
+		this.score_board.restart.anchor.setTo(0.5, 0);
+		this.score_board.restart.fixedToCamera = true;
+		this.score_board.restart.inputEnabled = true;
+		this.score_board.restart.events.onInputDown.add(this.restartGame, this);
 
 		// hide everything
+		this.score_board.restart.visible = false;
 		this.score_board.board.visible = false;
 		this.score_board.title.visible = false;
 		this.score_board.pstnTitle.visible = false;
@@ -383,6 +409,22 @@ InfinityFighter.Game.prototype = {
 				this.changeSpeed(-1);
 			}
 		}
+		if (this.score_board.restart.input.checkPointerOver(this.input.activePointer)) {
+			this.restartGame();
+		}
+	},
+	restartGame: function() {
+		// Reset all values
+		this._target_players = undefined;
+		this.players = undefined;
+		this.cars = [];
+		this.socket.disconnect();
+		this.socket = undefined;
+		this.current_player = undefined;
+		this.bgm.stop();
+		this.bgm = undefined;
+
+		this.state.start('StartMenu');
 	}
 }
 

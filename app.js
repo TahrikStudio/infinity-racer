@@ -8,7 +8,7 @@ var serv = require('http').Server(app); //Server-11
 const TIMEOUT_BEFORE_START = 5;
 const TURN_FACTOR = Math.PI / 4;
 const INITIAL_VELOCITY = 2;
-const PLAYER_COUNT = 2;
+const PLAYER_COUNT = 1;
 // Update angle & speed once in every UPDATE_FREQ frame
 const UPDATE_FREQ = 20;
 const SCREEN_HEIGHT = 800;
@@ -232,7 +232,7 @@ function syncClient(room) {
 // listen for a connection request from any client
 io.sockets.on('connection', function (socket) {
 	socket.emit('connect', {message: 'Connection established'});
-
+	console.log("Connected new client");
 	var room = pickupRoom();
 	room.addPlayer(socket);
 	if (!room.isfull()) {

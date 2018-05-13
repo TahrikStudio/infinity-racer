@@ -13,7 +13,7 @@ InfinityFighter.StartMenu.prototype = {
 		startBG.inputEnabled = true;
 		startBG.events.onInputDown.addOnce(this.startGame, this);
 		
-		startPrompt = this.add.text(this.world.centerX, this.world.centerY, 'Touch to Start!', {
+		startPrompt = this.add.text(this.camera.width / 2, this.camera.height / 2, 'Touch to Start!', {
 			font: "bold 24px Arial", 
 			fill: "#fff", 
 			boundsAlignH: "center", 
@@ -24,6 +24,6 @@ InfinityFighter.StartMenu.prototype = {
 
 	startGame: function (pointer) {
         // this.ding.play();
-		this.state.start('Game');
+		this.state.start('Game', true);
 	}
 };
