@@ -20,6 +20,7 @@ InfinityFighter.Preloader.prototype = {
         this.load.image('down', 'client/img/down.png');
         this.load.image('left', 'client/img/left.png');
         this.load.image('right', 'client/img/right.png');
+        this.load.image('finish', 'client/img/finish.png')
         // this.load.image('hill', 'images/hill.png');
         // this.load.image('sky', 'images/sky.png');
         // this.load.atlasXML('bunny', 'images/spritesheets/bunny.png', 'images/spritesheets/bunny.xml');

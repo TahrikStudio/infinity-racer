@@ -19,6 +19,7 @@ const SYNC_PERIOD = 300;
 const POS_FACTOR = 30;
 const TRACK_WIDTH = SCREEN_WIDTH / PLAYER_COUNT;
 const SPEED_FACTOR = 1;
+const STATUS_HEIGHT = 60;
 
 //send a index.html file when a get request is fired to the given 
 //route, which is ‘/’ in this case
@@ -49,6 +50,8 @@ class Player {
 		this.x = x;
 		this.y = y;
 		this.position = 1;
+		this.bound = false;
+		this.finished = false;
 	}
 }
 
@@ -95,47 +98,47 @@ class Room {
  * Pickup a room with spaces or create a new room if any room
  * 
  */
-var pickupRoom = function () {
+ var pickupRoom = function () {
 
-	for (var room of rooms) {
-		if (!room.isfull()) {
-			return room;
-		}
-	}
+ 	for (var room of rooms) {
+ 		if (!room.isfull()) {
+ 			return room;
+ 		}
+ 	}
 
-	var room = new Room(roomIndex++);
-	rooms.push(room);
-	return room;
-}
+ 	var room = new Room(roomIndex++);
+ 	rooms.push(room);
+ 	return room;
+ }
 
-function findRoomWithSocket(socket) {
-	var currentRoom;
-	for (var room of rooms) {
-		if (room.players.map(function (o) {
-			return o.id;
-		}).indexOf(socket.id) > -1) {
-			currentRoom = room;
-			break;
-		}
-	}
-	return currentRoom;
-}
+ function findRoomWithSocket(socket) {
+ 	var currentRoom;
+ 	for (var room of rooms) {
+ 		if (room.players.map(function (o) {
+ 			return o.id;
+ 		}).indexOf(socket.id) > -1) {
+ 			currentRoom = room;
+ 			break;
+ 		}
+ 	}
+ 	return currentRoom;
+ }
 
-function sendData(room, event, data) {
-	for (var player of room.players) {
-		io.sockets.connected[player.id].emit(event, data);
-	}
-}
+ function sendData(room, event, data) {
+ 	for (var player of room.players) {
+ 		io.sockets.connected[player.id].emit(event, data);
+ 	}
+ }
 
-function updateSpeed(data) {
-	var socket = this;
-	var roomIndex = rooms.map(function(o) {return o.id}).indexOf(data.room);
-	if (roomIndex > -1) {
-		var room = rooms[roomIndex];
-		var playerIndex = room.players.map(function (o) {return o.id}).indexOf(socket.id);
-		if (playerIndex > -1) {
-			var player = room.players[playerIndex];
-			player.velocity += data.factor * SPEED_FACTOR;
+ function updateSpeed(data) {
+ 	var socket = this;
+ 	var roomIndex = rooms.map(function(o) {return o.id}).indexOf(data.room);
+ 	if (roomIndex > -1) {
+ 		var room = rooms[roomIndex];
+ 		var playerIndex = room.players.map(function (o) {return o.id}).indexOf(socket.id);
+ 		if (playerIndex > -1) {
+ 			var player = room.players[playerIndex];
+ 			player.velocity += data.factor * SPEED_FACTOR;
 			//sendData(room, 'update', {room: room.id, players: room.players});
 		}
 	}
@@ -155,6 +158,21 @@ function updateAngle(data) {
 	}
 }
 
+function updateRank(room) {
+	var cloned = room.players.slice(0);
+	cloned.sort(function(a, b) {
+		return a.y - b.y;
+	});
+	for (var i = 0; i < cloned.length; i++) {
+		for (var player of room.players) {
+			if (cloned[i].id == player.id) {
+				player.position = i + 1;
+				break;
+			}
+		}
+	}
+}
+
 function updateParams(room) {
 	for (var player of room.players) {
 		var angle = player.angle % (2 * Math.PI);
@@ -162,35 +180,32 @@ function updateParams(room) {
 		var ydiff = Math.sin(angle) * player.velocity * POS_FACTOR;
 		var absXdiff = Math.abs(xdiff);
 		var absYdiff = Math.abs(ydiff);
-		console.log("xdiff : %f, ydiff : %f, angle : %f", xdiff, ydiff, angle * 180 / Math.PI);
-		console.log(xdiff);
-		console.log("(x, y)" + player.x + ", " + player.y);
-		if ((angle >= 0 && angle <= Math.PI || angle <= -Math.PI) && player.velocity > 0) {
-			if (player.y  - absYdiff > 60) {
+
+		if (player.finished) continue;
+
+		if ((angle >= 0 && angle <= Math.PI || angle <= -Math.PI) && player.velocity > 0
+			|| player.velocity < 0 && (angle > Math.PI  || angle < 0 && angle > -Math.PI)) {
+			if (player.y  - absYdiff > 2 * STATUS_HEIGHT) {
 				player.y -= absYdiff;
+				player.bound = false;
 			} else {
-				player.y = 60;
+				player.y = 2 * STATUS_HEIGHT;
+				player.velocity = 0;
+				player.bound = true;
+				player.finished = true;
 			}
-		} else {
+		} else if (absYdiff != 0){
 			if (player.y + absYdiff < WORLD_HEIGHT - 60) {
 				player.y += absYdiff;
+				player.bound = false;
 			} else {
 				player.y = WORLD_HEIGHT - 60;
+				player.velocity = 0;
+				player.bound = true;
 			}
 		}
-		// if (player.y >= 60 && ydiff < 0 || player.y <= WORLD_HEIGHT - 60 && ydiff > 0) {
-		// 	player.y += ydiff;
-		// } else {
-		// 	if (ydiff < 0) {
-		// 		player.y = 60;
-		// 	} else if (ydiff > 0) {
-		// 		player.y = WORLD_HEIGHT - 60;
-		// 	}
-		// }
-		// if (player.x > 60 && xdiff < 0 || player.x < WORLD_WIDTH - 60 && xdiff > 0) {
-		// 	console.log("Adding " + xdiff);
-		// 	player.x += xdiff;
-		// }
+
+		
 		if ((angle >= 0.5 * Math.PI && angle <= 1.5 * Math.PI || angle <= -0.5 * Math.PI && angle >= -1.5 * Math.PI) && player.velocity > 0) {
 			if (player.x - absXdiff > 60) {
 				player.x -= absXdiff;
@@ -205,6 +220,7 @@ function updateParams(room) {
 			}
 		}
 	}
+	updateRank(room);
 }
 
 function syncClient(room) {
