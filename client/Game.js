@@ -41,8 +41,6 @@ InfinityFighter.Game.prototype = {
 			_game.showMessage("Game will start \nin " + data.timeout + " seconds", 90);
 		});
 		this.socket.on("start", function(data) {
-			console.log("Received start command");
-			console.log("initial data " + data.players);
 			_game.bgm.play();
 			if (_game.sound.usingWebAudio &&
 				_game.sound.context.state === 'suspended') {
@@ -203,7 +201,6 @@ InfinityFighter.Game.prototype = {
 		this.countdown--;
 	},
 	update: function() {
-		console.log(this.time.fps);
 		this.updateTimeoutMessage();
 		if (this.playing) {
 			this.checkInput();
