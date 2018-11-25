@@ -8,7 +8,9 @@ var serv = require('http').Server(app); //Server-11
 const TIMEOUT_BEFORE_START = 5;
 const TURN_FACTOR = Math.PI / 4;
 const INITIAL_VELOCITY = 2;
-const PLAYER_COUNT = 3;
+const PLAYER_COUNT = 1;
+const INITIAL_ANGLE = Math. PI / 2;
+const ANGLE_RESET_FACTOR = Math.PI / 16;
 // Update angle & speed once in every UPDATE_FREQ frame
 const UPDATE_FREQ = 20;
 const SCREEN_HEIGHT = 800;
@@ -52,6 +54,7 @@ class Player {
 		this.position = 1;
 		this.bound = false;
 		this.finished = false;
+		this.timestamp = undefined;
 	}
 }
 
@@ -91,6 +94,7 @@ class Room {
 
 	start() {
 		this.started = true;
+		this.startTime = new Date().getTime();
 	}
 }
 
@@ -152,8 +156,11 @@ function updateAngle(data) {
 		var playerIndex = room.players.map(function (o) {return o.id}).indexOf(socket.id);
 		if (playerIndex > -1) {
 			var player = room.players[playerIndex];
-			player.angle = (player.angle + data.factor * TURN_FACTOR);
-			sendData(room, 'update', {room: room.id, players: room.players});
+			let angle = (player.angle + data.factor * TURN_FACTOR);
+			if (angle > Math.PI / 4 || angle < 3 * Math.PI / 4) {
+				player.angle = angle;
+				sendData(room, 'update', {room: room.id, players: room.players});
+			}
 		}
 	}
 }
@@ -161,7 +168,7 @@ function updateAngle(data) {
 function updateRank(room) {
 	var cloned = room.players.slice(0);
 	cloned.sort(function(a, b) {
-		return a.y - b.y;
+		return a.timestamp - b.timestamp;
 	});
 	for (var i = 0; i < cloned.length; i++) {
 		for (var player of room.players) {
@@ -175,6 +182,19 @@ function updateRank(room) {
 
 function updateParams(room) {
 	for (var player of room.players) {
+
+		// update angle on key-up
+		let angleDiff = Math.abs(INITIAL_ANGLE - player.angle);
+		if (angleDiff > ANGLE_RESET_FACTOR) {
+			if (player.angle > INITIAL_ANGLE) {
+				player.angle -= ANGLE_RESET_FACTOR;
+			} else if (player.angle < INITIAL_ANGLE) {
+				player.angle += ANGLE_RESET_FACTOR;
+			}
+		} else {
+			player.angle = INITIAL_ANGLE;
+		}
+
 		var angle = player.angle % (2 * Math.PI);
 		var xdiff = Math.cos(angle) * player.velocity * POS_FACTOR;
 		var ydiff = Math.sin(angle) * player.velocity * POS_FACTOR;
@@ -193,6 +213,7 @@ function updateParams(room) {
 				player.velocity = 0;
 				player.bound = true;
 				player.finished = true;
+				player.timestamp = (new Date().getTime() - room.startTime)/ 1000;
 			}
 		} else if (absYdiff != 0){
 			if (player.y + absYdiff < WORLD_HEIGHT - 60) {

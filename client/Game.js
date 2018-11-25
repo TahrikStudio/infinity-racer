@@ -145,15 +145,13 @@ InfinityFighter.Game.prototype = {
 		var player = this.players[index];
 		var target_player;
 
-		if (this._target_players != undefined) {
+		if (this._target_players) {
 			target_player = this._target_players[index];
-			var diff = (target_player.angle - player.angle) / 5;
-			// if (target_player.angle > Math.PI / 2 || target_player.angle < -Math.PI / 2) {
-			// 	return;
-			// }
-			if (diff > ANGLE_FACTOR && factor == 1 || diff < -ANGLE_FACTOR && factor == -1) {
+			var angle = target_player.angle + factor * ANGLE_FACTOR;
+			if (angle > 3 * Math.PI / 4 || angle < Math.PI / 4) {
 				return;
 			}
+			target_player.angle = angle;
 		}
 
 		this.socket.emit('updateAngle', {room: this.room, factor: factor});
@@ -270,6 +268,7 @@ InfinityFighter.Game.prototype = {
 					}
 					if (target.finished && player.y <= 2 * STATUS_HEIGHT){
 						player.finished = true;
+						player.timestamp = target.timestamp;
 					}
 				}
 			}
@@ -297,25 +296,30 @@ InfinityFighter.Game.prototype = {
 				this.score_board.title.visible = true;
 				this.score_board.pstnTitle.visible = true;
 				this.score_board.plyerTitle.visible = true;
+				this.score_board.timeTitle.visible = true;
 				this.score_board.position.visible = true;
 				this.score_board.player.visible = true;
+				this.score_board.time.visible = true;
 			}
 
 			var players = "";
 			var positions = "";
+			var times = "";
 			for (var i = 0; i < this.players.length; i++) {
 				var player = this.players[i];
 				if (player.finished) {
-					var desc = '';
+					var desc = '--';
 					if (player.id == this.socket.id) {
-						desc = ' (You)';
+						desc = '(You)';
 					}
-					players = players + player.id + desc + "\n";
+					players = players + /*player.id +*/ desc + "\n";
 					positions = positions + player.position + "\n";
+					times = times + player.timestamp + "s\n";
  				}
 			}
 			this.score_board.position.setText(positions);
 			this.score_board.player.setText(players);
+			this.score_board.time.setText(times);
 
 			if (!unfinished && !this.score_board.restart.visible) {
 				this.score_board.restart.visible = true;
@@ -353,12 +357,20 @@ InfinityFighter.Game.prototype = {
 		});
 		this.score_board.pstnTitle.fixedToCamera = true;
 
-		this.score_board.plyerTitle = this.add.text(this.camera.width - 60, ypos + 30, "Player", {
+		this.score_board.timeTitle = this.add.text(this.camera.width - 60, ypos + 30, "Time", {
 			font: "bold 14px Arial", 
 			fill: "#fff", 
 			align: "center"
 		});
-		this.score_board.plyerTitle.anchor.setTo(1, 0);
+		this.score_board.timeTitle.anchor.setTo(1, 0);
+		this.score_board.timeTitle.fixedToCamera = true;
+
+		this.score_board.plyerTitle = this.add.text(150, ypos + 30, "Player", {
+			font: "bold 14px Arial", 
+			fill: "#fff", 
+			align: "center"
+		});
+		this.score_board.plyerTitle.anchor.setTo(0, 0);
 		this.score_board.plyerTitle.fixedToCamera = true;
 
 		this.score_board.position = this.add.text(60, ypos + 60, "", {
@@ -367,13 +379,20 @@ InfinityFighter.Game.prototype = {
 			align: "center"
 		});
 		this.score_board.position.fixedToCamera = true;
-		this.score_board.player = this.add.text(this.camera.width - 60, ypos + 60, "", {
+		this.score_board.player = this.add.text(150, ypos + 60, "", {
 			font: "14px Arial", 
 			fill: "#fff", 
 			align: "center"
 		});
-		this.score_board.player.anchor.setTo(1, 0);
 		this.score_board.player.fixedToCamera = true;
+
+		this.score_board.time = this.add.text(this.camera.width - 60, ypos + 60, "", {
+			font: "14px Arial", 
+			fill: "#fff", 
+			align: "center"
+		});
+		this.score_board.time.anchor.setTo(1, 0);
+		this.score_board.time.fixedToCamera = true;
 		
 		this.score_board.restart = this.add.image(this.camera.width / 2, ypos + height + 10, 'restart');
 		this.score_board.restart.anchor.setTo(0.5, 0);
@@ -387,6 +406,7 @@ InfinityFighter.Game.prototype = {
 		this.score_board.title.visible = false;
 		this.score_board.pstnTitle.visible = false;
 		this.score_board.plyerTitle.visible = false;
+		this.score_board.timeTitle.visible = false;
 		this.score_board.position.visible = false;
 		this.score_board.player.visible = false;
 			
